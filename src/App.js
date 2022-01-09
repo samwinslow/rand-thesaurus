@@ -23,6 +23,7 @@ function getFirstWord(response) {
     def: {
       sense: cleanLatex(def.dt?.[0]?.[1]),
       viz: cleanLatex(def.dt?.[1]?.[1]?.[0]?.t),
+      syn_list: def.syn_list.flatMap(syns => syns.map(({ wd }) => wd))
     },
   }
 }
@@ -79,15 +80,30 @@ function App() {
           {isWordNotFound(responseData) ? (
             <p>{sentence && (<i>Word not found</i>)}</p>
           ) : (
-            <p>
-              Result <br />
-              { firstWord && (<>
-                <b>{firstWord.id} (<i>{firstWord.fl}</i>)</b>{'. '}
-                <i>{firstWord.def.sense.trim()}</i>
-                { firstWord.def.viz && `, as in "${firstWord.def.viz}"`}
-                </>)
-              }
-            </p>
+            firstWord && (
+              <>
+                <p>
+                  Result: <br />
+                  <b>{firstWord.id} (<i>{firstWord.fl}</i>)</b>{'. '}
+                  <i>{firstWord.def.sense.trim()}</i>
+                  { firstWord.def.viz && `, as in "${firstWord.def.viz}"`}
+                </p>
+                <div>
+                Synonyms: <br />
+                {
+                  firstWord.def.syn_list.length ? (
+                    <ul>
+                      {firstWord.def.syn_list.map((syn, i) => (
+                        <li key={`${i}_${syn}`}>{syn}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p>None found.</p>
+                  )
+                }
+                </div>
+              </>
+            )
           )}
         </div>
         <p>Result (JSON):</p>
