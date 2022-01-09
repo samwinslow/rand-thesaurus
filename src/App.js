@@ -21,13 +21,14 @@ function getFirstWord(response) {
     id: word.meta.id,
     fl: word.fl,
     def: {
-      sense: def.dt[0][1],
-      viz: cleanLatex(def.dt[1][1][0].t),
+      sense: cleanLatex(def.dt?.[0]?.[1]),
+      viz: cleanLatex(def.dt?.[1]?.[1]?.[0]?.t),
     },
   }
 }
 
 function cleanLatex(latex) {
+  if (!latex) return null
   return latex.replace(/\{\/?it\}/g, '')
 }
 
@@ -76,12 +77,16 @@ function App() {
       <div style={{ textAlign: 'left', padding: '0 2rem', fontSize: '150%' }}>
         <div>
           {isWordNotFound(responseData) ? (
-            <p>{sentence && <i>Word not found</i>}</p>
+            <p>{sentence && (<i>Word not found</i>)}</p>
           ) : (
             <p>
               Result <br />
-              <b>{firstWord.id} (<i>{firstWord.fl}</i>)</b>{'. '}
-              <i>{firstWord.def.sense.trim()}</i>, as in "{firstWord.def.viz}"
+              { firstWord && (<>
+                <b>{firstWord.id} (<i>{firstWord.fl}</i>)</b>{'. '}
+                <i>{firstWord.def.sense.trim()}</i>
+                { firstWord.def.viz && `, as in "${firstWord.def.viz}"`}
+                </>)
+              }
             </p>
           )}
         </div>
