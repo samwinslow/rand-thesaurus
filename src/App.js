@@ -1,60 +1,36 @@
-import { useEffect, useState } from 'react';
-import './App.css';
+import { useEffect, useState } from 'react'
+import './App.css'
+import { getThesaurusResponse, isWordNotFound, getMostCommonUsage } from './utils'
 
-async function getThesaurusResponse(word, apiKey) {
-  const url = `https://www.dictionaryapi.com/api/v3/references/thesaurus/json/${word}?key=${apiKey}`;
-  const response = await fetch(url);
-  const json = await response.json();
-  return json;
-}
+const formatDefinition = (usage) => (
+  <p>
+    Result: <br />
+    <b>{usage.id} (<i>{usage.fl}</i>)</b>{'. '}
+    <i>{usage.def.sense.trim()}</i>
+    { usage.def.viz && `, as in "${usage.def.viz}"`}
+  </p>
+)
 
-function isWordNotFound(response) {
-  return Array.isArray(response) && response.every(entry => typeof entry === 'string')
-}
+const App = () => {
+  const [apiKey, setApiKey] = useState('')
+  const [sentence, setSentence] = useState('')
+  const [responseData, setResponseData] = useState([])
+  const [currentUsage, setCurrentUsage] = useState(null)
+  const [history, setHistory] = useState([]) // Word-Synonym tuples
 
-function getFirstWord(response) {
-  console.log('getting', { response })
-  if (isWordNotFound(response)) return null
-  const word = response[0]
-  const def = word.def[0].sseq[0][0][1]
-  console.log({ word, def })
-  return {
-    id: word.meta.id,
-    fl: word.fl,
-    def: {
-      sense: cleanLatex(def.dt?.[0]?.[1]),
-      viz: cleanLatex(def.dt?.[1]?.[1]?.[0]?.t),
-      syn_list: def.syn_list?.flatMap(syns => syns.map(({ wd }) => wd)) || []
-    },
-  }
-}
-
-function cleanLatex(latex) {
-  if (!latex) return null
-  return latex.replace(/\{\/?it\}/g, '')
-}
-
-function App() {
-
-  const [apiKey, setApiKey] = useState('');
-  const [sentence, setSentence] = useState('');
-  const [responseData, setResponseData] = useState([]);
-  const [firstWord, setFirstWord] = useState(null);
-  const [history, setHistory] = useState([]); // Word-Synonym tuples
-
-  function pushToHistory(tuple) {
+  const pushToHistory = (tuple) => {
     return setHistory((history) => [...history, tuple])
   }
 
-  async function catchFormSubmit(event) {
-    event.preventDefault();
-    const response = await getThesaurusResponse(sentence, apiKey);
-    setResponseData(response);
+  const catchFormSubmit = async (event) => {
+    event.preventDefault()
+    const response = await getThesaurusResponse(sentence, apiKey)
+    setResponseData(response)
   }
 
   useEffect(() => {
-    const word = getFirstWord(responseData)
-    setFirstWord(word)
+    const usage = getMostCommonUsage(responseData)
+    setCurrentUsage(usage)
   }, [responseData])
 
   return (
@@ -86,21 +62,16 @@ function App() {
           {isWordNotFound(responseData) ? (
             <p>{sentence && (<i>Word not found</i>)}</p>
           ) : (
-            firstWord && (
+            currentUsage && (
               <>
-                <p>
-                  Result: <br />
-                  <b>{firstWord.id} (<i>{firstWord.fl}</i>)</b>{'. '}
-                  <i>{firstWord.def.sense.trim()}</i>
-                  { firstWord.def.viz && `, as in "${firstWord.def.viz}"`}
-                </p>
+                {formatDefinition(currentUsage)}
                 <div>
                 Synonyms: <br />
                 {
-                  firstWord.def.syn_list.length ? (
+                  currentUsage.def.syn_list.length ? (
                     <ul>
-                      {firstWord.def.syn_list.map((syn, i) => (
-                        <li key={`${i}_${syn}`}>{syn} <a href="#" onClick={() => pushToHistory([firstWord.id, syn])}>+ add</a></li>
+                      {currentUsage.def.syn_list.map((syn, i) => (
+                        <li key={`${i}_${syn}`}>{syn} <a href="#" onClick={() => pushToHistory([currentUsage.id, syn])}>+ add</a></li>
                       ))}
                     </ul>
                   ) : (
@@ -108,7 +79,7 @@ function App() {
                   )
                 }
                 <ul>
-                  <li>"{firstWord.id}" (unchanged) <a href="#" onClick={() => pushToHistory([firstWord.id, firstWord.id])}>+ add</a></li>
+                  <li>"{currentUsage.id}" (unchanged) <a href="#" onClick={() => pushToHistory([currentUsage.id, currentUsage.id])}>+ add</a></li>
                 </ul>
                 </div>
               </>
@@ -138,7 +109,7 @@ function App() {
         </details>
       </div>
     </div>
-  );
+  )
 }
 
-export default App;
+export default App
