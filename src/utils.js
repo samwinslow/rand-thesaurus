@@ -4,9 +4,10 @@ const cleanLatex = (latex) => {
 }
 
 export const getThesaurusResponse = async (word, apiKey) => {
+  if (!word || !apiKey) return null
   const url = `https://www.dictionaryapi.com/api/v3/references/thesaurus/json/${word}?key=${apiKey}`
   const response = await fetch(url)
-  return await response.json()
+  return await response.json() // Vulnerable to invalid key errors or 4xx/5xx
 }
 
 export const isWordNotFound = (response) => (

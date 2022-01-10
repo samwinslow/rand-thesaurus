@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import './App.css'
 import { getThesaurusResponse, isWordNotFound, getMostCommonUsage } from './utils'
 
+// NB: only the first, and most common, definition is used for each word!
 const formatDefinition = (usage) => (
   <p>
     Result: <br />
@@ -11,9 +12,16 @@ const formatDefinition = (usage) => (
   </p>
 )
 
+const STATUS = {
+  clean: 0,
+  dirty: 1,
+  fetching: 2,
+}
+
 const App = () => {
-  const [apiKey, setApiKey] = useState('')
+  const [apiKey, setApiKey] = useState(process.env.REACT_APP_WEBSTER_API_KEY || '')
   const [sentence, setSentence] = useState('')
+  const [fetchingStatus, setFetchingStatus] = useState(STATUS.clean)
   const [responseData, setResponseData] = useState([])
   const [currentUsage, setCurrentUsage] = useState(null)
   const [history, setHistory] = useState([]) // Word-Synonym tuples
@@ -22,10 +30,21 @@ const App = () => {
     return setHistory((history) => [...history, tuple])
   }
 
-  const catchFormSubmit = async (event) => {
-    event.preventDefault()
+  const submitForm = async () => {
+    setFetchingStatus(STATUS.fetching)
     const response = await getThesaurusResponse(sentence, apiKey)
     setResponseData(response)
+    setFetchingStatus(STATUS.clean)
+  }
+
+  const catchFormSubmit = async (event) => {
+    event.preventDefault()
+    await submitForm()
+  }
+
+  const handleSentenceChange = (event) => {
+    setSentence(event.target.value)
+    setFetchingStatus(STATUS.dirty)
   }
 
   useEffect(() => {
@@ -52,61 +71,75 @@ const App = () => {
           type="text"
           name="sentence"
           value={sentence}
-          onChange={(event) => setSentence(event.target.value)}
-          placeholder="Word or sentence"
+          onChange={handleSentenceChange}
+          placeholder="Word or phrase"
         />
-        <input type="submit" />
+        <button type="submit">Find synonyms</button>
+        <button onClick={() => {
+          const customText = prompt(`Enter a custom synonym for "${sentence}", or leave blank to use as-is.`)
+          pushToHistory([sentence, customText || sentence])
+        }}>+ custom</button>
       </form>
-      <div style={{ textAlign: 'left', padding: '0 2rem', fontSize: '150%' }}>
+      <div className="main">
         <div>
-          {isWordNotFound(responseData) ? (
-            <p>{sentence && (<i>Word not found</i>)}</p>
-          ) : (
-            currentUsage && (
-              <>
-                {formatDefinition(currentUsage)}
-                <div>
-                Synonyms: <br />
-                {
-                  currentUsage.def.syn_list.length ? (
-                    <ul>
-                      {currentUsage.def.syn_list.map((syn, i) => (
-                        <li key={`${i}_${syn}`}>{syn} <a href="#" onClick={() => pushToHistory([currentUsage.id, syn])}>+ add</a></li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p>None found.</p>
-                  )
-                }
-                <ul>
-                  <li>"{currentUsage.id}" (unchanged) <a href="#" onClick={() => pushToHistory([currentUsage.id, currentUsage.id])}>+ add</a></li>
-                </ul>
-                </div>
-              </>
+          {fetchingStatus === STATUS.dirty ? (
+            <button type="link" onClick={submitForm}>update search</button>
+          ) :
+            fetchingStatus === STATUS.fetching ? '...' :
+            (
+              isWordNotFound(responseData) ? (
+              <p>{sentence && <>
+                <i>"{sentence}" was not found</i>{' '}
+                <button type="link" onClick={() => pushToHistory([sentence, sentence])}>+ add anyway</button>
+              </>}</p>
+            ) : (
+              currentUsage && (
+                <>
+                  {formatDefinition(currentUsage)}
+                  <div>
+                  Synonyms:
+                  {
+                    currentUsage.def.syn_list.length ? (
+                      <ul>
+                        {currentUsage.def.syn_list.map((syn, i) => (
+                          <li key={`${i}_${syn}`}>{syn} <button type="link" onClick={() => pushToHistory([currentUsage.id, syn])}>+ add</button></li>
+                        ))}
+                      </ul>
+                    ) : ' None found'
+                  }
+                  <ul>
+                    <li>"{sentence}" (unchanged) <button type="link" onClick={() => pushToHistory([sentence, sentence])}>+ add</button></li>
+                  </ul>
+                  </div>
+                </>
+              )
             )
           )}
         </div>
-        <p>Your sentence:</p>
-        <pre style={{ fontSize: '100%' }}>
+        <div className="output">
           Original:<br />
           {history.map(([word]) => word).join(' ')}<br /><br />
           Thesaurified:<br />
-          {history.map(([, syn]) => syn).join(' ')}
-        </pre>
-        <details>
-          <summary>
-            History <a href="#" onClick={() => setHistory([])}>clear</a>
-          </summary>
-          <pre>
-            {JSON.stringify(history, null, 2)}
-          </pre>
-        </details>
-        <details>
-          <summary>Last API response</summary>
-          <pre>
-            {JSON.stringify(responseData, null, 2)}
-          </pre>
-        </details>
+          <b>{history.map(([, syn]) => syn).join(' ')}</b>
+        </div>
+        <div style={{ marginTop: '1rem '}}>
+          <details>
+            <summary>
+              History{' '}
+              <button type="link" onClick={() => setHistory([])}>× clear</button>
+              <button type="link" onClick={() => setHistory((hist) => hist.slice(0, hist.length - 1))}>⌫ rm last</button>
+            </summary>
+            <pre>
+              {JSON.stringify(history, null, 2)}
+            </pre>
+          </details>
+          <details>
+            <summary>Last API response</summary>
+            <pre>
+              {JSON.stringify(responseData, null, 2)}
+            </pre>
+          </details>
+        </div>
       </div>
     </div>
   )
